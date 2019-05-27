@@ -1,7 +1,15 @@
 //
 // Created by Alexander Galilov on 26.05.2019.
 // E-Mail: alexander.galilov@gmail.com 
-
+//
+// To be sure it will work properly please do some changes:
+// In /boot/cmdline.txt add spidev.bufsiz=65536. In my case the result is:
+// dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=PARTUUID=da6e0af0-02 rootfstype=ext4 elevator=deadline fsck.repair=yes spidev.bufsiz=65536 rootwait
+//
+// In /boot/config.txt add the following line:
+// core_freq=250
+// It will fix the issue https://github.com/raspberrypi/linux/issues/2094
+// I implemented workaround and I hope this step is not required but...
 #ifndef LED_H
 #define LED_H
 
