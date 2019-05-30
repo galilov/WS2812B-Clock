@@ -20,7 +20,7 @@ double g_realSpiSpeed = 0;
 //https://cdn.sparkfun.com/datasheets/BreakoutBoards/WS2812B.pdf
 #define LONG_SIGNAL_uS    0.9
 #define SHORT_SIGNAL_uS   0.35
-#define RESET_SIGNAL_uS   80.0
+#define RESET_SIGNAL_uS   70.0
 #define uS_PER_SECOND     1000000.0
 #define LONG_SIGNAL_IN_SPI_BITS     ((int)(LONG_SIGNAL_uS*g_realSpiSpeed/uS_PER_SECOND))
 #define SHORT_SIGNAL_IN_SPI_BITS    ((int)(SHORT_SIGNAL_uS*g_realSpiSpeed/uS_PER_SECOND))
@@ -105,7 +105,7 @@ void Led::_hardwareInit() {
         const auto nIterations = (size_t)(1.0 / blockTransferApproxTime);
         auto *data = (unsigned char *) calloc(1, bufSize);
         ::timespec t0, t1;
-        ::clock_gettime(CLOCK_REALTIME, &t0);;
+        ::clock_gettime(CLOCK_REALTIME, &t0); //CLOCK_PROCESS_CPUTIME_ID does not work :(
         for (int i = 0; i < nIterations; i++) {
             ::wiringPiSPIDataRW(_spiChannel, data, bufSize);
         }
