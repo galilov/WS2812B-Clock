@@ -11,6 +11,8 @@
 #include "main.h"
 #include "Effects.h"
 
+//Visual effects: https://www.tweaking4all.com/hardware/arduino/adruino-led-strip-effects/
+
 void setAll(WS2812B::RGB &rgb) {
     for (int i = 0; i < NUM_LEDS; i++) {
         leds.setColor(rgb, i);

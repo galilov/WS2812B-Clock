@@ -5,6 +5,8 @@
 #ifndef EFFECTS_H
 #define EFFECTS_H
 
+//Visual effects: https://www.tweaking4all.com/hardware/arduino/adruino-led-strip-effects/
+
 typedef unsigned char byte;
 typedef unsigned int uint32_t;
 typedef byte uint8_t;

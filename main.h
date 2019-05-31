@@ -5,7 +5,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define NUM_LEDS         32
+#define NUM_LEDS         24
 
 #include "ws2812b/Led.h"
 

@@ -15,8 +15,8 @@ int main() {
         //SnowSparkle(0x10, 0x10, 0x10, 20, myRandom(100,1000));
         //RunningLights(0xff,0xff,0x00, 50);
         //rainbowCycle(5);
-        Fire(55,120,50);
-        //BouncingBalls(0xff,0,0, 3);
+        //Fire(55,120,50);
+        BouncingBalls(0xff,0,0, 3);
         //meteorRain(0xff,0xff,0xff,4, 64, true, 30);
         //showClock();
     }

@@ -156,10 +156,9 @@ void Led::_hardwareInit() {
     }
 }
 
-
 #endif
 
-
+// common part
 Led::~Led() {
     _hardwareCleanup();
 }
@@ -185,7 +184,7 @@ void Led::_hardwareWriteData() {
     if (_hardwareFd == -1) {
         throw std::ios_base::failure("Use _hardwareInit() to open SPI channel");
     }
-    wiringPiSPIDataRW(_spiChannel, &_spiData[0], _spiData.size());
+    ::write(_hardwareFd, &_spiData[0], _spiData.size());
 }
 
 void Led::_hardwareCleanup() {
