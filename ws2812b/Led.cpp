@@ -11,6 +11,10 @@
 
 using namespace WS2812B;
 
+#define USE_SIMPLE_IMPLEMENTATION true
+
+#if !USE_SIMPLE_IMPLEMENTATION
+
 // Set bitrate to *about* 5 MHz.
 #define SPI_SPEED           5000000
 
@@ -39,26 +43,6 @@ Led::Led(int spiChannel, int numLeds) :
     size_t sz = (size_t) ((LONG_SIGNAL_IN_SPI_BITS + SHORT_SIGNAL_IN_SPI_BITS) * 8 * 3 * _numLeds +
                           RESET_SIGNAL_IN_SPI_BITS) / 8;
     _spiData.reserve(sz);
-}
-
-Led::~Led() {
-    _hardwareCleanup();
-}
-
-void Led::clear() {
-    for (size_t i = 0; i < _rgbData.size(); i++) {
-        _rgbData[i].clear();
-    }
-}
-
-void Led::setColor(const WS2812B::RGB &color, int ledIndex) {
-    _checkLedIndexRange(ledIndex);
-    _rgbData[ledIndex] = color;
-}
-
-WS2812B::RGB &Led::getColor(int ledIndex) {
-    _checkLedIndexRange(ledIndex);
-    return _rgbData[ledIndex];
 }
 
 void Led::show() {
@@ -118,6 +102,85 @@ void Led::_hardwareInit() {
     }
 }
 
+#else
+// Simple implementation
+// Set SPI bitrate to 3.2 MHz.
+#define SPI_SPEED           3200000
+
+// 1 PWM bit has 4 SPI bits at 3.2MHz
+#define PWM_ZERO                    0b1000
+#define PWM_ONE                     0b1110
+#define RESET_SIGNAL_IN_SPI_BYTES   20
+
+Led::Led(int spiChannel, int numLeds) :
+        _spiChannel(spiChannel), _numLeds(numLeds), _hardwareFd(-1) {
+    _hardwareInit();
+    // allocate RGB data
+    _rgbData.reserve(numLeds);
+    for (int i = 0; i < numLeds; i++) {
+        _rgbData.emplace_back(RGB());
+    }
+    // allocate SPI buffer 12 bytes per LED + RESET signal size in bytes
+    size_t sz = (size_t) (12 * _numLeds + RESET_SIGNAL_IN_SPI_BYTES);
+    _spiData.reserve(sz);
+}
+
+void Led::show() {
+    for (auto const &srcRGBValue: _rgbData) {
+        unsigned char grb[] = {srcRGBValue._g, srcRGBValue._r, srcRGBValue._b};
+        for (auto const &srcValue:grb) {
+            unsigned char current = 0;
+            for (size_t srcBitIndex = 0; srcBitIndex < 8; srcBitIndex++) {
+                size_t srcBitValue = (srcValue << srcBitIndex) & 0x080U;
+                unsigned char pattern = (srcBitValue != 0 ? PWM_ONE : PWM_ZERO);
+                if (srcBitIndex % 2 == 0) {
+                    current = pattern << 4;
+                } else {
+                    current |=  pattern;
+                    _spiData.push_back(current);
+                }
+
+            }
+        }
+    }
+    for (size_t i = 0; i < RESET_SIGNAL_IN_SPI_BYTES; i++) {
+        _spiData.push_back(0);
+    }
+    _hardwareWriteData();
+    _spiData.clear();
+}
+
+void Led::_hardwareInit() {
+    if (_hardwareFd == -1) {
+        _hardwareFd = wiringPiSPISetup(_spiChannel, SPI_SPEED);
+    }
+}
+
+
+#endif
+
+
+Led::~Led() {
+    _hardwareCleanup();
+}
+
+void Led::clear() {
+    for (size_t i = 0; i < _rgbData.size(); i++) {
+        _rgbData[i].clear();
+    }
+}
+
+void Led::setColor(const WS2812B::RGB &color, int ledIndex) {
+    _checkLedIndexRange(ledIndex);
+    _rgbData[ledIndex] = color;
+}
+
+WS2812B::RGB &Led::getColor(int ledIndex) {
+    _checkLedIndexRange(ledIndex);
+    return _rgbData[ledIndex];
+}
+
+
 void Led::_hardwareWriteData() {
     if (_hardwareFd == -1) {
         throw std::ios_base::failure("Use _hardwareInit() to open SPI channel");
@@ -136,3 +199,4 @@ void Led::_checkLedIndexRange(int ledIndex) {
     if (ledIndex < 0) throw std::invalid_argument("ledIndex should be >= 0");
     if (ledIndex > _numLeds) throw std::invalid_argument("ledIndex should be < numLeds passed to the constructor");
 }
+
