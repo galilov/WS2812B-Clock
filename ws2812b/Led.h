@@ -9,7 +9,7 @@
 // In /boot/config.txt add the following line:
 // core_freq=250
 // It will fix the issue https://github.com/raspberrypi/linux/issues/2094
-// I implemented workaround and I hope this step is not required but...
+// I implemented workaround (for USE_SIMPLE_IMPLEMENTATION == false) and I hope this step is not required but...
 #ifndef LED_H
 #define LED_H
 
@@ -17,11 +17,17 @@
 #include <vector>
 #include "RGB.h"
 
+// Set it to true when the line
+// core_freq=250
+// is added to /boot/config.txt
+#define USE_SIMPLE_IMPLEMENTATION true
+
 namespace WS2812B {
     class Led {
     public:
         // Constructor
-        // spiChannel -- can be used to select target device
+        // spiChannel -- can be used to select target device. It is not used by LEDs but can be supported by
+        //               external hardware.
         // numLeds -- the number of leds in chain/stripe/matrix/ring...
         Led(int spiChannel, int numLeds);
 

@@ -11,7 +11,8 @@
 
 using namespace WS2812B;
 
-#define USE_SIMPLE_IMPLEMENTATION true
+// See protocol description at https://static.chipdip.ru/lib/554/DOC001554925.pdf or
+// https://www.digikey.com/en/datasheets/parallaxinc/parallax-inc-28085-ws2812b-rgb-led-datasheet
 
 #if !USE_SIMPLE_IMPLEMENTATION
 
@@ -21,7 +22,6 @@ using namespace WS2812B;
 // see _hardwareInit() and https://github.com/raspberrypi/linux/issues/2094
 double g_realSpiSpeed = 0;
 
-//https://cdn.sparkfun.com/datasheets/BreakoutBoards/WS2812B.pdf
 #define LONG_SIGNAL_uS    0.9
 #define SHORT_SIGNAL_uS   0.35
 #define RESET_SIGNAL_uS   70.0
@@ -104,13 +104,14 @@ void Led::_hardwareInit() {
 
 #else
 // Simple implementation
-// Set SPI bitrate to 3.2 MHz.
-#define SPI_SPEED           3200000
+// Set SPI bitrate to 3.333 MHz.
+#define SPI_SPEED           3333000
 
-// 1 PWM bit has 4 SPI bits at 3.2MHz
+// Each PWM bit is projected to 4 SPI bits at 3.333MHz
 #define PWM_ZERO                    0b1000
 #define PWM_ONE                     0b1110
-#define RESET_SIGNAL_IN_SPI_BYTES   20
+#define RESET_SIGNAL_IN_SECONDS     0.000060
+#define RESET_SIGNAL_IN_SPI_BYTES   ((int)(SPI_SPEED * RESET_SIGNAL_IN_SECONDS)/8.0)
 
 Led::Led(int spiChannel, int numLeds) :
         _spiChannel(spiChannel), _numLeds(numLeds), _hardwareFd(-1) {
@@ -120,7 +121,7 @@ Led::Led(int spiChannel, int numLeds) :
     for (int i = 0; i < numLeds; i++) {
         _rgbData.emplace_back(RGB());
     }
-    // allocate SPI buffer 12 bytes per LED + RESET signal size in bytes
+    // allocate SPI buffer 12 bytes (24 bits PWM) per LED + RESET signal size in bytes
     size_t sz = (size_t) (12 * _numLeds + RESET_SIGNAL_IN_SPI_BYTES);
     _spiData.reserve(sz);
 }
