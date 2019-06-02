@@ -5,8 +5,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <stdexcept>
-#include <iostream>
-#include <wiringPiSPI.h>
+#include <bits/ios_base.h>
 #include "Led.h"
 
 using namespace WS2812B;
@@ -19,7 +18,7 @@ using namespace WS2812B;
 // Set bitrate to *about* 5 MHz.
 #define SPI_SPEED           5000000
 
-// see _hardwareInit() and https://github.com/raspberrypi/linux/issues/2094
+// see constructor code and https://github.com/raspberrypi/linux/issues/2094
 double g_realSpiSpeed = 0;
 
 #define LONG_SIGNAL_uS    0.9
@@ -32,8 +31,31 @@ double g_realSpiSpeed = 0;
 
 
 Led::Led(int spiChannel, int numLeds) :
-        _spiChannel(spiChannel), _numLeds(numLeds), _hardwareFd(-1) {
-    _hardwareInit();
+        _spiChannel(spiChannel), _numLeds(numLeds) {
+    _spi.open(_spiChannel, SPI_SPEED, 0);
+
+    // Some magic to fix https://github.com/raspberrypi/linux/issues/2094
+    if (g_realSpiSpeed == 0) {
+        const auto bufSize = 16000;
+        const double blockTransferApproxTime = bufSize * 8.0 / SPI_SPEED;
+        const auto nIterations = (size_t)(1.0 / blockTransferApproxTime);
+        std::vector<unsigned char> data;
+        data.reserve(bufSize);
+        for(int i = 0; i < bufSize; i++) {
+            data.push_back(0);
+        }
+        ::timespec t0, t1;
+        ::clock_gettime(CLOCK_REALTIME, &t0); //CLOCK_PROCESS_CPUTIME_ID does not work :(
+        for (int i = 0; i < nIterations; i++) {
+            _spi.write(data);
+        }
+        ::clock_gettime(CLOCK_REALTIME, &t1);
+        long long nSecT0 = t0.tv_sec * 1000000000LL + t0.tv_nsec;
+        long long nSecT1 = t1.tv_sec * 1000000000LL + t1.tv_nsec;
+        g_realSpiSpeed = nIterations * 8.0 * bufSize * 1000000000L / (nSecT1 - nSecT0);
+        //printf("g_realSpeed: %f bits per second\n", g_realSpiSpeed);
+    }
+
     // allocate RGB data
     _rgbData.reserve(numLeds);
     for (int i = 0; i < numLeds; i++) {
@@ -76,30 +98,8 @@ void Led::show() {
     for (size_t i = 0; i < RESET_SIGNAL_IN_SPI_BITS / 8; i++) {
         _spiData.push_back(0);
     }
-    _hardwareWriteData();
+    _spi.write(_spiData);
     _spiData.clear();
-}
-
-void Led::_hardwareInit() {
-    _hardwareFd = wiringPiSPISetup(_spiChannel, SPI_SPEED);
-    // Some magic to fix https://github.com/raspberrypi/linux/issues/2094
-    if (g_realSpiSpeed == 0) {
-        const auto bufSize = 16000;
-        const double blockTransferApproxTime = bufSize * 8.0 / SPI_SPEED;
-        const auto nIterations = (size_t)(1.0 / blockTransferApproxTime);
-        auto *data = (unsigned char *) calloc(1, bufSize);
-        ::timespec t0, t1;
-        ::clock_gettime(CLOCK_REALTIME, &t0); //CLOCK_PROCESS_CPUTIME_ID does not work :(
-        for (int i = 0; i < nIterations; i++) {
-            ::wiringPiSPIDataRW(_spiChannel, data, bufSize);
-        }
-        ::clock_gettime(CLOCK_REALTIME, &t1);
-        ::free(data);
-        long long nSecT0 = t0.tv_sec * 1000000000LL + t0.tv_nsec;
-        long long nSecT1 = t1.tv_sec * 1000000000LL + t1.tv_nsec;
-        g_realSpiSpeed = nIterations * 8.0 * bufSize * 1000000000L / (nSecT1 - nSecT0);
-        //printf("g_realSpeed: %f bits per second\n", g_realSpiSpeed);
-    }
 }
 
 #else
@@ -114,8 +114,8 @@ void Led::_hardwareInit() {
 #define RESET_SIGNAL_IN_SPI_BYTES   ((int)(SPI_SPEED * RESET_SIGNAL_IN_SECONDS)/8.0)
 
 Led::Led(int spiChannel, int numLeds) :
-        _spiChannel(spiChannel), _numLeds(numLeds), _hardwareFd(-1) {
-    _hardwareInit();
+        _spiChannel(spiChannel), _numLeds(numLeds) {
+    _spi.open(_spiChannel, SPI_SPEED, 0);
     // allocate RGB data
     _rgbData.reserve(numLeds);
     for (int i = 0; i < numLeds; i++) {
@@ -147,21 +147,15 @@ void Led::show() {
     for (size_t i = 0; i < RESET_SIGNAL_IN_SPI_BYTES; i++) {
         _spiData.push_back(0);
     }
-    _hardwareWriteData();
+    _spi.write(_spiData);
     _spiData.clear();
-}
-
-void Led::_hardwareInit() {
-    if (_hardwareFd == -1) {
-        _hardwareFd = wiringPiSPISetup(_spiChannel, SPI_SPEED);
-    }
 }
 
 #endif
 
 // common part
 Led::~Led() {
-    _hardwareCleanup();
+    _spi.close();
 }
 
 void Led::clear() {
@@ -178,21 +172,6 @@ void Led::setColor(const WS2812B::RGB &color, int ledIndex) {
 WS2812B::RGB &Led::getColor(int ledIndex) {
     _checkLedIndexRange(ledIndex);
     return _rgbData[ledIndex];
-}
-
-
-void Led::_hardwareWriteData() {
-    if (_hardwareFd == -1) {
-        throw std::ios_base::failure("Use _hardwareInit() to open SPI channel");
-    }
-    ::write(_hardwareFd, &_spiData[0], _spiData.size());
-}
-
-void Led::_hardwareCleanup() {
-    if (_hardwareFd != -1) {
-        ::close(_hardwareFd);
-        _hardwareFd = -1;
-    }
 }
 
 void Led::_checkLedIndexRange(int ledIndex) {

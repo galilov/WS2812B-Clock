@@ -16,7 +16,7 @@
 #include <stddef.h>
 #include <vector>
 #include "RGB.h"
-
+#include "../spi/SPI.h"
 // Set it to true when the line
 // core_freq=250
 // is added to /boot/config.txt
@@ -47,22 +47,13 @@ namespace WS2812B {
     private:
         // disable copy constructor
         Led(const Led &);
-
-        // Init SPI parameters
-        void _hardwareInit();
-
-        // Write data to SPI controller
-        void _hardwareWriteData();
-
-        // Close & cleanup SPI
-        void _hardwareCleanup();
         void _checkLedIndexRange(int ledIndex);
     private:
         const int _spiChannel;
         const int _numLeds;
-        int _hardwareFd;
         std::vector<RGB> _rgbData;
         std::vector<unsigned char> _spiData;
+        SPI _spi;
     };
 
 }
